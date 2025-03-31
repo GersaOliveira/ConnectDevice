@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Connect Device</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="nav_header_title">Connect Device</string>
+    <string name="nav_header_subtitle">1.0</string>
+    <string name="nav_header_desc">Navigation header</string>
+    <string name="action_settings">Settings</string>
+
+    <string name="menu_home">Home</string>
+    <string name="menu_Bluetooth">Bluetooth</string>
+    <string name="menu_NFC">NFC</string>
+    <string name="adress_value">Adress</string>
+    <string name="value_adress">0</string>
+    <string name="refresh_list">Refresh</string>
+</resources>
