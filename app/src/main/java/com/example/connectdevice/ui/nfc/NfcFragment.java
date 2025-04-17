@@ -65,7 +65,7 @@ public class NfcFragment extends Fragment {
         populateAddressList();
 
         btnWrite.setOnClickListener(v -> {
-
+            btnWrite.setEnabled(false);
             String addressStr = binding.inputAddress.getText().toString();
             String valueStr = binding.inputMessage.getText().toString();
 
@@ -106,7 +106,9 @@ public class NfcFragment extends Fragment {
                     }
                 }
             }
+
             populateAddressList();
+            btnWrite.setEnabled(true);
         });
 
 
@@ -178,24 +180,16 @@ public class NfcFragment extends Fragment {
                 return;
             }
 
-
             NfcV nfcv = NfcV.get(tag);
 
             if (nfcv != null) {
                 try {
-                    //nfcv.close();
-                    nfcv.connect(); // Conecta antes da leitura
+                    nfcv.connect();
                     addressList.clear(); // Limpa a lista antes de preencher
-                    int v = 0;
-                    for (int i = 0; i <= 252; i += 4) {
 
-                        byte blockAddress = (byte) v;
-                        String valor = nfcViewModel.readNfcVTag(nfcv, blockAddress);
-                        addressList.add("Address " + i + ": " + valor);
-                        v++;
-                    }
+                    addressList.addAll(nfcViewModel.readMultipleBlocks(nfcv, (byte) 0, 64));
 
-                    nfcv.close(); // Fecha após leitura
+                    nfcv.close();
 
                     // Atualiza a ListView
                     getActivity().runOnUiThread(new Runnable() {
@@ -211,4 +205,5 @@ public class NfcFragment extends Fragment {
             }
         }
     }
+
 }
