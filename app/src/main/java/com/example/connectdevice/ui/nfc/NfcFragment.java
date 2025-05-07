@@ -93,10 +93,10 @@ public class NfcFragment extends Fragment {
 
                     if (tag != null) {
 
-                        String[] techList = tag.getTechList();
+                 /*       String[] techList = tag.getTechList();
                         for (String tech : techList) {
                             Log.i("NFC", "Tecnologia suportada: " + tech);
-                        }
+                        }*/
 
                         NfcV nfcv = NfcV.get(tag);
                         nfcViewModel.writeToNfcVTag(nfcv, blockAddress, valueStr);
@@ -184,12 +184,11 @@ public class NfcFragment extends Fragment {
 
             if (nfcv != null) {
                 try {
+                    nfcv.close();
                     nfcv.connect();
                     addressList.clear(); // Limpa a lista antes de preencher
 
                     addressList.addAll(nfcViewModel.readMultipleBlocks(nfcv, (byte) 0, 64));
-
-                    nfcv.close();
 
                     // Atualiza a ListView
                     getActivity().runOnUiThread(new Runnable() {

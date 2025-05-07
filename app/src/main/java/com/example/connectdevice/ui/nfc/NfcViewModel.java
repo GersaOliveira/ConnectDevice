@@ -36,9 +36,7 @@ public class NfcViewModel extends AndroidViewModel {
         try {
             // Delay para estabilizar a conexão
             nfcv.close();
-            Thread.sleep(5);
             nfcv.connect();
-            Thread.sleep(5);
 
             // UID da tag
             byte[] uid = nfcv.getTag().getId();
@@ -56,6 +54,15 @@ public class NfcViewModel extends AndroidViewModel {
             int maxByte = 16;
             int numBlocks = paddedData.length / maxByte;
 
+            byte[] con = manageGPO(uid,(byte) 0x00, nfcv);
+            byte[] ret = nfcv.transceive(con);
+
+            if (ret[0] == 1 && ret[1] == 2) {
+                Log.d("NFC", "Erro manageGPO: comando invalido");
+            } else {
+                Log.d("NFC", "manageGPO OK");
+            }
+
             for (int i = 0; i < numBlocks; i++) {
                 int startIndex = i * maxByte;
                 byte[] blockData = Arrays.copyOfRange(paddedData, startIndex, startIndex + maxByte);
@@ -63,19 +70,24 @@ public class NfcViewModel extends AndroidViewModel {
                 byte[] writeCommand = writeMultipleBlocks(uid, (byte)(blockAddress), blockData);
 
                 // Executa a escrita
+
                 byte[] response = nfcv.transceive(writeCommand);
                 if (response[0] == 0) {
                     blockAddress += 4;
                     Log.d("NFC", "Escrita realizada com sucesso no bloco " + (blockAddress + i) + ": " + bytesToHex(blockData));
                 } else {
                     Log.d("NFC", "Erro ao realizar escrita no bloco " + (blockAddress + i) + ": " + bytesToHex(response));
-                    // Você pode decidir se quer parar aqui ou continuar tentando os próximos blocos
                 }
 
                 // Pequena pausa entre as escritas
-                Thread.sleep(25);
-            }
+                Thread.sleep(50);
 
+            }
+            //flag(nfcv, (byte) 0x00,(byte) 0x41);
+           con = manageGPO(uid,(byte) 0x01, nfcv);
+           ret = nfcv.transceive(con);
+
+            Log.d("NFC", "Escrita NFC concluída e processada pelo MCU");
             nfcv.close();
 
         } catch (IOException | InterruptedException e) {
@@ -142,7 +154,7 @@ public class NfcViewModel extends AndroidViewModel {
             writeCommand[0] = 0x22;  // Flag (endereçamento usando UID)
             writeCommand[1] = 0x24;  // Comando de múltiplos blocos
 
-            System.arraycopy(uid, 0, writeCommand, 2, 8);  // UID (8 bytes)
+            System.arraycopy(uid, 0, writeCommand, 2, 8); // UID (8 bytes)
 
             writeCommand[10] = blockAddress; // Bloco inicial
             writeCommand[11] = (byte) ((data.length / 4) - 1); // Número de blocos - 1
@@ -159,27 +171,25 @@ public class NfcViewModel extends AndroidViewModel {
     }
 
     public void clear(NfcV nfcv){
+        int i =0;
         try {
             byte[] dataToWrite = new byte[]{0x00, 0x00, 0x00, 0x00};
 
-
             byte[] uid = nfcv.getTag().getId();
+            nfcv.close();
+            nfcv.connect();
+            for (i = 0; i < 63; i ++) {
 
-            for (int i = 0; i < 63; i ++) {
-
-                nfcv.connect();
-                Thread.sleep(50);
                 byte blockAddress = (byte) i;
                 byte[] writeCommand =  createWriteCommand(uid, blockAddress ,dataToWrite);
 
                 byte[] response = nfcv.transceive(writeCommand);
-                nfcv.close();
-                Thread.sleep(50);
                 if (response[0] == 0) {
                     Log.d("NFC", "Escrita realizada com sucesso ");
                 } else {
                     Log.d("NFC", "Erro ao realizar escrita : " + bytesToHex(response));
                 }
+                Thread.sleep(50);
             }
 
         }catch (Exception e){
@@ -215,7 +225,7 @@ public class NfcViewModel extends AndroidViewModel {
 
             // Enviar o comando e receber a resposta
             byte[] response = nfcv.transceive(readCommand);
-
+            Thread.sleep(25);
             Log.d("NFC_READ", "Received response: " + bytesToHex(response));
 
             // Verificar se a resposta é válida
@@ -233,10 +243,11 @@ public class NfcViewModel extends AndroidViewModel {
                 }
                 return addressList;
             } else {
+
                 Log.e("NFC_READ", "Read failed. Error code: " + String.format("%02X", response[0]));
                 return null;
             }
-        } catch (IOException e) {
+        } catch (IOException | InterruptedException e) {
             Log.e("NFC_READ", "Error reading from tag: " + e.getMessage());
             return null;
         }
@@ -248,5 +259,20 @@ public class NfcViewModel extends AndroidViewModel {
             sb.append(String.format("%02X ", b));
         }
         return sb.toString().trim();
+    }
+
+    private byte[] manageGPO(byte[] uid, byte gpoValue,NfcV nfcv) {
+        try {
+            return new byte[]{
+                    (byte) 0x22,
+                    (byte) 0xA9,
+                    (byte) 0x02,
+                    uid[0], uid[1], uid[2], uid[3], uid[4], uid[5], uid[6], uid[7],  // UID completo
+                    (byte) gpoValue};
+
+        } catch (Exception e) {
+            Log.e("NFC_MANAGE_GPO", "Erro manageGPO: " + e.getMessage());
+        }
+        return null;
     }
 }
