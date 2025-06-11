@@ -24,7 +24,7 @@
         android:id="@+id/btn_write"
         android:layout_width="0dp"
         android:layout_height="53dp"
-        android:text="OK"
+        android:text="@string/btn_write_text"
         app:layout_constraintEnd_toEndOf="@+id/input_message"
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="@+id/input_message"
@@ -68,13 +68,13 @@
         android:id="@+id/address_list_view"
         android:layout_width="0dp"
         android:layout_height="0dp"
+        android:layout_marginTop="20dp"
         android:layout_marginBottom="10dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="@+id/btn_write"
-        app:layout_constraintHorizontal_bias="0.403"
+        app:layout_constraintHorizontal_bias="1.0"
         app:layout_constraintStart_toStartOf="@+id/btn_write"
-        app:layout_constraintTop_toBottomOf="@+id/btn_clear"
-        app:layout_constraintVertical_bias="0.0">
+        app:layout_constraintTop_toBottomOf="@+id/switch1">
 
 
     </ListView>
@@ -84,9 +84,35 @@
         android:layout_width="0dp"
         android:layout_height="53dp"
         android:text="Clear"
+        app:layout_constraintBottom_toTopOf="@+id/switch1"
         app:layout_constraintEnd_toEndOf="@+id/btn_write"
         app:layout_constraintHorizontal_bias="1.0"
         app:layout_constraintStart_toStartOf="@+id/btn_write"
         app:layout_constraintTop_toBottomOf="@+id/btn_write" />
+
+    <Switch
+        android:id="@+id/switch1"
+        android:layout_width="0dp"
+        android:layout_height="27dp"
+        android:layout_marginTop="20dp"
+        android:text="@string/Switch_text"
+        android:textAlignment="textStart"
+        android:textSize="16sp"
+        app:layout_constraintEnd_toStartOf="@+id/switch2"
+        app:layout_constraintStart_toStartOf="@+id/btn_clear"
+        app:layout_constraintTop_toBottomOf="@+id/btn_clear"
+        tools:ignore="UseSwitchCompatOrMaterialXml,TouchTargetSizeCheck" />
+
+    <Switch
+        android:id="@+id/switch2"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="@string/switch2"
+        android:textSize="16sp"
+        android:visibility="invisible"
+        app:layout_constraintEnd_toEndOf="@+id/btn_clear"
+        app:layout_constraintStart_toEndOf="@+id/switch1"
+        app:layout_constraintTop_toBottomOf="@+id/btn_clear" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

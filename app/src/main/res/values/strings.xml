@@ -11,6 +11,9 @@
     <string name="menu_Bluetooth">Bluetooth</string>
     <string name="menu_NFC">NFC</string>
     <string name="adress_value">Adress</string>
-    <string name="value_adress">1</string>
+    <string name="value_adress">0</string>
     <string name="refresh_list">Refresh</string>
+    <string name="Switch_text">Write Multiple Blocks</string>
+    <string name="switch2">Double Send Test</string>
+    <string name="btn_write_text">Send</string>
 </resources>

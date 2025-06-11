@@ -8,15 +8,21 @@ import android.content.IntentFilter;
 import android.nfc.NfcAdapter;
 import android.nfc.tech.NfcV;
 import android.util.Log;
+
 import androidx.lifecycle.AndroidViewModel;
+
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 public class NfcViewModel extends AndroidViewModel {
 
     private NfcAdapter nfcAdapter;
+    private ArrayList<byte[]> listValue;
+
+    public boolean StatusRead;
+
 
     public NfcViewModel(Application application) {
         super(application);
@@ -32,44 +38,98 @@ public class NfcViewModel extends AndroidViewModel {
         return new IntentFilter[]{new IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED)};
     }
 
-    public void writeToNfcVTag(NfcV nfcv, byte blockAddress, String data) {
+    public void writeMultipleBlocks(NfcV nfcv, byte blockAddress, String data, boolean tst) {
         try {
-            // Delay para estabilizar a conexão
-            nfcv.close();
-            nfcv.connect();
 
             // UID da tag
             byte[] uid = nfcv.getTag().getId();
-            byte[] dataToWrite = data.getBytes();
+            String[] byteStrings = data.split(",");
+
+            int count = Math.min(byteStrings.length, 256);
+
+            byte[] numericBytes = new byte[byteStrings.length];
+
+            for (int i = 0; i < count; i++) {
+
+                String trimmedByteString = byteStrings[i].trim(); // Remove espaços em branco
+                if (trimmedByteString.isEmpty()) {
+                    Log.e("NFC_WRITE", "Valor de byte vazio encontrado na string de dados: " + data);
+                    // Tratar o erro adequadamente, talvez retornando ou lançando uma exceção
+                }
+                // Converte a string para byte.
+                // Byte.parseByte() espera valores entre -128 e 127.
+
+                numericBytes[i] = Byte.parseByte(trimmedByteString);
+
+            }
+
+
+            byte[] dataToWrite = numericBytes;
 
             // Pad the data to 256 bytes
             byte[] paddedData;
 
             if (dataToWrite.length > 256) {
                 Log.e("NFC_WRITE", "Quantidade de bytes superior a 256");
-                return;
             }
-             paddedData = padDataTo256Bytes(dataToWrite);
+            paddedData = padDataTo256Bytes(dataToWrite);
 
             int maxByte = 16;
             int numBlocks = paddedData.length / maxByte;
 
-            byte[] con = manageGPO(uid,(byte) 0x00, nfcv);
-            byte[] ret = nfcv.transceive(con);
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
-            if (ret[0] == 1 && ret[1] == 2) {
-                Log.d("NFC", "Erro manageGPO: comando invalido");
-            } else {
-                Log.d("NFC", "manageGPO OK");
+            if (tst) {
+                // Se tst for true, a intenção é usar listValue como fonte,
+                // processar seus blocos e o resultado se torna o novo paddedData.
+                if (listValue != null && !listValue.isEmpty()) {
+                    for (byte[] block : listValue) {
+                        if (block != null) {
+                            try {
+                                byte[] incrementedBlock = block;
+                               // byte[] incrementedBlock = incrementLittleEndian(block);
+                                if (incrementedBlock != null) {
+                                    outputStream.write(incrementedBlock);
+                                } else {
+                                    Log.w("NFC_CONVERT", "incrementLittleEndian retornou null para o bloco: " + (block != null ? bytesToHex(block) : "null"));
+                                }
+                            } catch (IOException e) {
+                                Log.e("NFC_CONVERT", "Erro ao escrever bloco incrementado para ByteArrayOutputStream", e);
+                            }
+                        } else {
+                            Log.w("NFC_CONVERT", "Bloco nulo encontrado em listValue.");
+                        }
+                    }
+                    paddedData = outputStream.toByteArray();
+                    Log.d("NFC_TST_MODE", "paddedData atualizado a partir de listValue (tst=true): " + (paddedData != null ? bytesToHex(paddedData) : "null"));
+
+                    if (paddedData.length != 256) {
+                        Log.w("NFC_TST_MODE", "paddedData (de listValue) tem " + paddedData.length + " bytes. Ajustando para 256 bytes.");
+                        byte[] tempPaddedData = new byte[256];
+                        System.arraycopy(paddedData, 0, tempPaddedData, 0, Math.min(paddedData.length, 256));
+                        paddedData = tempPaddedData;
+                    }
+
+                } else {
+                    Log.w("NFC_TST_MODE", "listValue está nula ou vazia, mas tst=true. paddedData não será modificado a partir de listValue.");
+                }
             }
 
+            if (!nfcv.isConnected()){
+                nfcv.close();
+                Thread.sleep(5);
+                nfcv.connect();
+            }
+
+            manageGPO(uid, (byte) 0x00, nfcv);
+
+
             for (int i = 0; i < numBlocks; i++) {
+
                 int startIndex = i * maxByte;
                 byte[] blockData = Arrays.copyOfRange(paddedData, startIndex, startIndex + maxByte);
 
-                byte[] writeCommand = writeMultipleBlocks(uid, (byte)(blockAddress), blockData);
-
-                // Executa a escrita
+                byte[] writeCommand = CommandWriteMultipleBlocks(uid, (byte) (blockAddress), blockData);
 
                 byte[] response = nfcv.transceive(writeCommand);
                 if (response[0] == 0) {
@@ -79,16 +139,13 @@ public class NfcViewModel extends AndroidViewModel {
                     Log.d("NFC", "Erro ao realizar escrita no bloco " + (blockAddress + i) + ": " + bytesToHex(response));
                 }
 
-                // Pequena pausa entre as escritas
                 Thread.sleep(50);
 
             }
-            //flag(nfcv, (byte) 0x00,(byte) 0x41);
-           con = manageGPO(uid,(byte) 0x01, nfcv);
-           ret = nfcv.transceive(con);
 
-            Log.d("NFC", "Escrita NFC concluída e processada pelo MCU");
+            manageGPO(uid, (byte) 0x01, nfcv);
             nfcv.close();
+            Log.d("NFC", "Escrita NFC concluída e processada pelo MCU");
 
         } catch (IOException | InterruptedException e) {
             Log.e("NFC_WRITE", "Erro ao escrever na tag: " + e.getMessage());
@@ -147,7 +204,7 @@ public class NfcViewModel extends AndroidViewModel {
         return null;
     }
 
-    private byte[] writeMultipleBlocks(byte[] uid, byte blockAddress, byte[] data) {
+    private byte[] CommandWriteMultipleBlocks(byte[] uid, byte blockAddress, byte[] data) {
         try {
             // Comando de escrita em múltiplos blocos (0x24)
             byte[] writeCommand = new byte[12 + data.length];
@@ -170,18 +227,23 @@ public class NfcViewModel extends AndroidViewModel {
         return null;
     }
 
-    public void clear(NfcV nfcv){
-        int i =0;
+    public void clear(NfcV nfcv) {
+        int i = 0;
+
         try {
-            byte[] dataToWrite = new byte[]{0x00, 0x00, 0x00, 0x00};
+
+            if (!nfcv.isConnected()){
+                nfcv.close();
+                nfcv.connect();
+            }
+
 
             byte[] uid = nfcv.getTag().getId();
-            nfcv.close();
-            nfcv.connect();
-            for (i = 0; i < 63; i ++) {
+            for (i = 0; i < 64; i++) {
 
+                byte[] dataToWrite = new byte[]{0x00, 0x00, 0x00, 0x00};
                 byte blockAddress = (byte) i;
-                byte[] writeCommand =  createWriteCommand(uid, blockAddress ,dataToWrite);
+                byte[] writeCommand = createWriteCommand(uid, blockAddress, dataToWrite);
 
                 byte[] response = nfcv.transceive(writeCommand);
                 if (response[0] == 0) {
@@ -189,26 +251,34 @@ public class NfcViewModel extends AndroidViewModel {
                 } else {
                     Log.d("NFC", "Erro ao realizar escrita : " + bytesToHex(response));
                 }
+
+
                 Thread.sleep(50);
             }
 
-        }catch (Exception e){
+            Log.d("NFC", "Erro ao realizar escrita : FIM");
+           // nfcv.close();
+        } catch (Exception e) {
             Log.e("NFC", "Escrita com erro: " + e.toString());
         }
+
+
     }
 
     private byte[] padDataTo256Bytes(byte[] data) {
         byte[] paddedData = new byte[256];
         System.arraycopy(data, 0, paddedData, 0, data.length);
-        // The rest of the array is automatically filled with zeros
         return paddedData;
     }
 
-    public ArrayList<String> readMultipleBlocks(NfcV nfcv, byte firstBlockNumber, int numberOfBlocks) {
+    public ArrayList<String> readMultipleBlocks(NfcV nfcv, byte firstBlockNumber, int numberOfBlocks) throws InterruptedException {
         if (numberOfBlocks < 1 || numberOfBlocks > 256) {
             throw new IllegalArgumentException("Number of blocks must be between 1 and 256");
         }
         ArrayList<String> addressList = new ArrayList<String>();
+
+        listValue = new ArrayList<byte[]>();
+
         try {
             byte[] uid = nfcv.getTag().getId();
 
@@ -218,9 +288,14 @@ public class NfcViewModel extends AndroidViewModel {
                     (byte) 0x23,  // Comando Read Multiple Block
                     uid[0], uid[1], uid[2], uid[3], uid[4], uid[5], uid[6], uid[7],  // UID (8 bytes)
                     firstBlockNumber,  // Número do primeiro bloco
-                    (byte)(numberOfBlocks - 1)  // Número de blocos - 1
+                    (byte) (numberOfBlocks - 1)  // Número de blocos - 1
             };
-
+            Thread.sleep(50);
+            if (!nfcv.isConnected()){
+                nfcv.close();
+                nfcv.connect();
+            }
+            Thread.sleep(50);
             Log.d("NFC_READ", "Sending read command: " + bytesToHex(readCommand));
 
             // Enviar o comando e receber a resposta
@@ -239,11 +314,12 @@ public class NfcViewModel extends AndroidViewModel {
                         byte[] block = Arrays.copyOfRange(data, i, i + 4);
                         String valor = bytesToHexR(block);
                         addressList.add("Address " + i + ": " + valor);
+                        listValue.add(block);
                     }
                 }
+
                 return addressList;
             } else {
-
                 Log.e("NFC_READ", "Read failed. Error code: " + String.format("%02X", response[0]));
                 return null;
             }
@@ -261,18 +337,112 @@ public class NfcViewModel extends AndroidViewModel {
         return sb.toString().trim();
     }
 
-    private byte[] manageGPO(byte[] uid, byte gpoValue,NfcV nfcv) {
+    public void manageGPO(byte[] uid, byte gpoValue, NfcV nfcv) {
         try {
-            return new byte[]{
+
+            byte[] con = new byte[]{
                     (byte) 0x22,
                     (byte) 0xA9,
                     (byte) 0x02,
                     uid[0], uid[1], uid[2], uid[3], uid[4], uid[5], uid[6], uid[7],  // UID completo
                     (byte) gpoValue};
 
+            byte[] ret = nfcv.transceive(con);
+
+
+            if (ret[0] == 1 && ret[1] == 2) {
+                Log.d("NFC", "Erro manageGPO: comando invalido");
+            } else if (ret[0] == 0) {
+                Log.d("NFC", "manageGPO OK");
+            }
+
         } catch (Exception e) {
             Log.e("NFC_MANAGE_GPO", "Erro manageGPO: " + e.getMessage());
         }
-        return null;
     }
+
+    public void writeSingleBloc(NfcV nfcv, byte blockAddress, String data) {
+        try {
+
+            if (!nfcv.isConnected()){
+                nfcv.close();
+                Thread.sleep(50);
+                nfcv.connect();
+                Thread.sleep(50);
+            }
+
+            byte[] paddedData;
+            byte[] uid = nfcv.getTag().getId();
+            String[] byteStrings = data.split(",");
+            int count = Math.min(byteStrings.length, 4);
+            byte[] numericBytes = new byte[byteStrings.length];
+
+            for (int i = 0; i < count; i++) {
+                String trimmedByteString = byteStrings[i].trim(); // Remove espaços em branco
+                if (trimmedByteString.isEmpty()) {
+                    Log.e("NFC_WRITE", "Valor de byte vazio encontrado na string de dados: " + data);
+                    // Tratar o erro adequadamente, talvez retornando ou lançando uma exceção
+                    return; // Exemplo
+                }
+                // Converte a string para byte.
+                // Byte.parseByte() espera valores entre -128 e 127.
+                numericBytes[i] = Byte.parseByte(trimmedByteString);
+            }
+
+            byte[] dataToWrite = numericBytes;
+
+            paddedData = padDataTo4Bytes(dataToWrite);
+
+
+
+            manageGPO(uid,(byte) 0x00, nfcv);
+
+            byte[] writeCommand = createWriteCommand(uid, blockAddress, paddedData);
+
+            byte[] response = nfcv.transceive(writeCommand);
+            if (response[0] == 0) {
+                Log.d("NFC", "Escrita realizada com sucesso ");
+            } else {
+                Log.d("NFC", "Erro ao realizar escrita : " + bytesToHex(response));
+            }
+            Thread.sleep(50);
+
+            manageGPO(uid,(byte) 0x01, nfcv);
+
+            nfcv.close();
+        } catch (Exception e) {
+            Log.e("NFC", "Escrita com erro: " + e.toString());
+        }
+    }
+
+    private byte[] padDataTo4Bytes(byte[] data) {
+        byte[] paddedData = new byte[5];
+        System.arraycopy(data, 0, paddedData, 0, data.length);
+        return paddedData;
+    }
+
+    private static byte[] incrementLittleEndian(byte[] byteArray) {
+        if (byteArray == null || byteArray.length != 4) {
+            throw new IllegalArgumentException("O array de entrada deve ter exatamente 4 bytes.");
+        }
+
+        byte[] result = Arrays.copyOf(byteArray, byteArray.length);
+
+        for (int i = 0; i < result.length; i++) {
+            // Incrementa o byte atual
+            // (result[i] & 0xFF) trata o byte como um valor não assinado (0-255)
+            // antes de adicionar 1. O cast para byte lida com o overflow (255 + 1 = 0).
+            result[i] = (byte) ((result[i] & 0xFF) + 1);
+
+            // Se o byte não estourou (não voltou para 0 após o incremento),
+            // significa que não precisamos carregar para o próximo byte.
+            if (result[i] != 0) {
+                break; // Incremento concluído
+            }
+            // Se result[i] == 0, o incremento causou um overflow neste byte,
+            // então continuamos o loop para incrementar o próximo byte (carry).
+        }
+        return result;
+    }
+
 }

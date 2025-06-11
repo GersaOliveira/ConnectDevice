@@ -7,6 +7,8 @@ import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.NfcV;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -15,13 +17,21 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
+
 import com.example.connectdevice.MainActivity;
 import com.example.connectdevice.databinding.FragmentNfcBinding;
+
 import java.util.ArrayList;
+
+import android.widget.Switch;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class NfcFragment extends Fragment {
 
@@ -31,10 +41,17 @@ public class NfcFragment extends Fragment {
     private EditText inputMessage;
     private EditText inputAddress;
     private Button btnWrite;
-    private  Button btnClear;
+    private Button btnClear;
     private ListView addressListView;
     private ArrayList<String> addressList;
     private ArrayAdapter<String> adapter;
+    private NfcV nfcv;
+    private boolean writeMultipleBlocs;
+    private Switch aSwitch;
+    private Switch bSwitch;
+    private final Handler mainUiHandler = new Handler(Looper.getMainLooper());
+    private final ExecutorService backgroundExecutor = Executors.newSingleThreadExecutor();
+    private Handler mainThreadHandler = new Handler(Looper.getMainLooper());
 
     @Nullable
     @Override
@@ -61,8 +78,18 @@ public class NfcFragment extends Fragment {
         adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_1, addressList);
         addressListView.setAdapter(adapter);
         btnClear = binding.btnClear;
+        aSwitch = binding.switch1;
+       bSwitch = binding.switch2;
 
         populateAddressList();
+
+        aSwitch.setOnClickListener(view -> {
+            if (aSwitch.isChecked()) {
+                bSwitch.setVisibility(View.VISIBLE);
+            } else {
+                bSwitch.setVisibility(View.INVISIBLE);
+            }
+        });
 
         btnWrite.setOnClickListener(v -> {
             btnWrite.setEnabled(false);
@@ -76,7 +103,7 @@ public class NfcFragment extends Fragment {
 
             int intAdress = Integer.parseInt(addressStr);
             byte blockAddress = (byte) intAdress;  // Exemplo: bloco 0
-           // int intValue = Integer.parseInt(valueStr); // Converte a string para inteiro
+            // int intValue = Integer.parseInt(valueStr); // Converte a string para inteiro
             //byte valueToWrite = (byte) intValue;
 
             Log.i("NFC", "Tentando escrever na tag NFC no endereço: " + blockAddress + " com o valor: " + valueStr);
@@ -92,25 +119,65 @@ public class NfcFragment extends Fragment {
                     Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
 
                     if (tag != null) {
-
-                 /*       String[] techList = tag.getTechList();
-                        for (String tech : techList) {
-                            Log.i("NFC", "Tecnologia suportada: " + tech);
-                        }*/
-
                         NfcV nfcv = NfcV.get(tag);
-                        nfcViewModel.writeToNfcVTag(nfcv, blockAddress, valueStr);
+
+                        if (aSwitch.isChecked() && !bSwitch.isChecked()) {
+                            nfcViewModel.writeMultipleBlocks(nfcv, blockAddress, valueStr, false);
+
+                        } else if (aSwitch.isChecked() && bSwitch.isChecked()) {
+
+                            backgroundExecutor.execute(() -> { // (2)
+                                try {
+                                    int count = 0;
+
+                                    while (bSwitch.isChecked() && count < 11) {
+
+                                            populateAddressList();
+
+                                            if (!nfcViewModel.StatusRead) {
+                                                try {
+                                                    nfcViewModel.writeMultipleBlocks(nfcv, blockAddress, valueStr, true);
+                                                    Thread.sleep(3000);
+                                                } catch (Exception e) {
+                                                    Log.e("NFC_LOOP", " writeMultipleBlocks Exception: " + e.getMessage());
+                                                }
+                                                count++;
+                                            }
+
+
+                                        if (count == 10) {
+                                            mainThreadHandler.post(new Runnable() {
+                                                @Override
+                                                public void run() {
+                                                    bSwitch.setChecked(false);
+                                                }
+                                            });
+                                            count = 0;
+                                        }
+
+
+                                    }
+
+                                } catch (Exception e) {
+                                    Log.e("NFC_LOOP", "Exception: " + e.toString());
+                                }
+                            });
+
+
+                        } else {
+                            nfcViewModel.writeSingleBloc(nfcv, blockAddress, valueStr);
+                        }
 
                     } else {
                         Log.e("NFC", "Nenhuma tag NFC detectada!");
                     }
                 }
             }
+            if (!bSwitch.isChecked())
+                populateAddressList();
 
-            populateAddressList();
             btnWrite.setEnabled(true);
         });
-
 
         btnClear.setOnClickListener(v -> {
 
@@ -134,17 +201,19 @@ public class NfcFragment extends Fragment {
                         }
 
                         NfcV nfcv = NfcV.get(tag);
+
                         nfcViewModel.clear(nfcv);
+
 
                     } else {
                         Log.e("NFC", "Nenhuma tag NFC detectada!");
                     }
                 }
             }
-            populateAddressList();
+
+            if (!bSwitch.isChecked())
+                populateAddressList();
         });
-
-
         return root;
     }
 
@@ -170,39 +239,54 @@ public class NfcFragment extends Fragment {
     }
 
     private void populateAddressList() {
-        if (getActivity() instanceof MainActivity) {
-            MainActivity activity = (MainActivity) getActivity();
-            Intent intent = activity.getIntent();
-            Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+        try {
 
-            if (tag == null) {
-                Log.e("NFC", "Tag NFC não encontrada!");
-                return;
-            }
+            nfcViewModel.StatusRead = true;
 
-            NfcV nfcv = NfcV.get(tag);
+            if (getActivity() instanceof MainActivity) {
+                MainActivity activity = (MainActivity) getActivity();
+                Intent intent = activity.getIntent();
+                Log.d("NFC", "1");
+                Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+                NfcV nfcv = NfcV.get(tag);
+                Log.d("NFC", "2");
+                if (tag == null) {
+                    Log.e("NFC", "Tag NFC não encontrada!");
+                    return;
+                }
+                Log.d("NFC", "3");
+                if (nfcv != null) {
 
-            if (nfcv != null) {
-                try {
-                    nfcv.close();
-                    nfcv.connect();
+                    Log.d("NFC", "4");
+                    if (!nfcv.isConnected()) {
+                        nfcv.close();
+                        nfcv.connect();
+                    }
+                    Log.d("NFC", "5");
                     addressList.clear(); // Limpa a lista antes de preencher
-
+                    StringBuilder valorSemAddress = new StringBuilder();
+                    Log.d("NFC", "6");
                     addressList.addAll(nfcViewModel.readMultipleBlocks(nfcv, (byte) 0, 64));
-
                     // Atualiza a ListView
+                    Log.d("NFC", "7");
                     getActivity().runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
                             adapter.notifyDataSetChanged();
                         }
                     });
-
-                } catch (Exception e) {
-                    e.printStackTrace();
+                    Log.d("NFC", "8");
+                    nfcv.close();
+                    Log.d("NFC", "9");
                 }
             }
+
+            nfcViewModel.StatusRead = false;
+        } catch (Exception e) {
+            nfcViewModel.StatusRead = false;
+            Log.e("NFC", "populateAddressList Exception: " + e.getMessage());
         }
     }
+
 
 }
