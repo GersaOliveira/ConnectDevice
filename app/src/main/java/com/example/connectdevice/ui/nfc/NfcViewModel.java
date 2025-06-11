@@ -38,7 +38,7 @@ public class NfcViewModel extends AndroidViewModel {
         return new IntentFilter[]{new IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED)};
     }
 
-    public void writeMultipleBlocks(NfcV nfcv, byte blockAddress, String data, boolean tst) {
+    public void writeMultipleBlocks(NfcV nfcv, byte blockAddress, String data, boolean bSwitch) {
         try {
 
             // UID da tag
@@ -79,7 +79,7 @@ public class NfcViewModel extends AndroidViewModel {
 
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
-            if (tst) {
+            if (bSwitch) {
                 // Se tst for true, a intenção é usar listValue como fonte,
                 // processar seus blocos e o resultado se torna o novo paddedData.
                 if (listValue != null && !listValue.isEmpty()) {
@@ -392,7 +392,6 @@ public class NfcViewModel extends AndroidViewModel {
             byte[] dataToWrite = numericBytes;
 
             paddedData = padDataTo4Bytes(dataToWrite);
-
 
             manageGPO(uid, (byte) 0x00, nfcv);
 
