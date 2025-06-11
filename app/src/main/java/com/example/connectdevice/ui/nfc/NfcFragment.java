@@ -79,7 +79,7 @@ public class NfcFragment extends Fragment {
         addressListView.setAdapter(adapter);
         btnClear = binding.btnClear;
         aSwitch = binding.switch1;
-       bSwitch = binding.switch2;
+        bSwitch = binding.switch2;
 
         populateAddressList();
 
@@ -132,17 +132,17 @@ public class NfcFragment extends Fragment {
 
                                     while (bSwitch.isChecked() && count < 11) {
 
-                                            populateAddressList();
+                                        populateAddressList();
 
-                                            if (!nfcViewModel.StatusRead) {
-                                                try {
-                                                    nfcViewModel.writeMultipleBlocks(nfcv, blockAddress, valueStr, true);
-                                                    Thread.sleep(3000);
-                                                } catch (Exception e) {
-                                                    Log.e("NFC_LOOP", " writeMultipleBlocks Exception: " + e.getMessage());
-                                                }
-                                                count++;
+                                        if (!nfcViewModel.StatusRead) {
+                                            try {
+                                                nfcViewModel.writeMultipleBlocks(nfcv, blockAddress, valueStr, true);
+                                                Thread.sleep(3000);
+                                            } catch (Exception e) {
+                                                Log.e("NFC_LOOP", " writeMultipleBlocks Exception: " + e.getMessage());
                                             }
+                                            count++;
+                                        }
 
 
                                         if (count == 10) {

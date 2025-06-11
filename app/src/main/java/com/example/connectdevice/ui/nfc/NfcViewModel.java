@@ -87,7 +87,7 @@ public class NfcViewModel extends AndroidViewModel {
                         if (block != null) {
                             try {
                                 byte[] incrementedBlock = block;
-                               // byte[] incrementedBlock = incrementLittleEndian(block);
+                                // byte[] incrementedBlock = incrementLittleEndian(block);
                                 if (incrementedBlock != null) {
                                     outputStream.write(incrementedBlock);
                                 } else {
@@ -115,7 +115,7 @@ public class NfcViewModel extends AndroidViewModel {
                 }
             }
 
-            if (!nfcv.isConnected()){
+            if (!nfcv.isConnected()) {
                 nfcv.close();
                 Thread.sleep(5);
                 nfcv.connect();
@@ -232,7 +232,7 @@ public class NfcViewModel extends AndroidViewModel {
 
         try {
 
-            if (!nfcv.isConnected()){
+            if (!nfcv.isConnected()) {
                 nfcv.close();
                 nfcv.connect();
             }
@@ -257,7 +257,7 @@ public class NfcViewModel extends AndroidViewModel {
             }
 
             Log.d("NFC", "Erro ao realizar escrita : FIM");
-           // nfcv.close();
+            // nfcv.close();
         } catch (Exception e) {
             Log.e("NFC", "Escrita com erro: " + e.toString());
         }
@@ -291,7 +291,7 @@ public class NfcViewModel extends AndroidViewModel {
                     (byte) (numberOfBlocks - 1)  // Número de blocos - 1
             };
             Thread.sleep(50);
-            if (!nfcv.isConnected()){
+            if (!nfcv.isConnected()) {
                 nfcv.close();
                 nfcv.connect();
             }
@@ -364,7 +364,7 @@ public class NfcViewModel extends AndroidViewModel {
     public void writeSingleBloc(NfcV nfcv, byte blockAddress, String data) {
         try {
 
-            if (!nfcv.isConnected()){
+            if (!nfcv.isConnected()) {
                 nfcv.close();
                 Thread.sleep(50);
                 nfcv.connect();
@@ -394,8 +394,7 @@ public class NfcViewModel extends AndroidViewModel {
             paddedData = padDataTo4Bytes(dataToWrite);
 
 
-
-            manageGPO(uid,(byte) 0x00, nfcv);
+            manageGPO(uid, (byte) 0x00, nfcv);
 
             byte[] writeCommand = createWriteCommand(uid, blockAddress, paddedData);
 
@@ -407,7 +406,7 @@ public class NfcViewModel extends AndroidViewModel {
             }
             Thread.sleep(50);
 
-            manageGPO(uid,(byte) 0x01, nfcv);
+            manageGPO(uid, (byte) 0x01, nfcv);
 
             nfcv.close();
         } catch (Exception e) {
