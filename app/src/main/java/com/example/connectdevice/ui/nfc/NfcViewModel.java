@@ -60,9 +60,7 @@ public class NfcViewModel extends AndroidViewModel {
                 // Byte.parseByte() espera valores entre -128 e 127.
 
                 numericBytes[i] = Byte.parseByte(trimmedByteString);
-
             }
-
 
             byte[] dataToWrite = numericBytes;
 
@@ -123,7 +121,6 @@ public class NfcViewModel extends AndroidViewModel {
 
             manageGPO(uid, (byte) 0x00, nfcv);
 
-
             for (int i = 0; i < numBlocks; i++) {
 
                 int startIndex = i * maxByte;
@@ -140,7 +137,6 @@ public class NfcViewModel extends AndroidViewModel {
                 }
 
                 Thread.sleep(50);
-
             }
 
             manageGPO(uid, (byte) 0x01, nfcv);
@@ -151,7 +147,6 @@ public class NfcViewModel extends AndroidViewModel {
             Log.e("NFC_WRITE", "Erro ao escrever na tag: " + e.getMessage());
         }
     }
-
 
     private byte[] createWriteCommand(byte[] uid, byte blockAddress, byte[] dataToWrite) {
 
@@ -208,7 +203,7 @@ public class NfcViewModel extends AndroidViewModel {
         try {
             // Comando de escrita em múltiplos blocos (0x24)
             byte[] writeCommand = new byte[12 + data.length];
-            writeCommand[0] = 0x22;  // Flag (endereçamento usando UID)
+            writeCommand[0] = 0x22;  // Flag (endereçamento usando UID) ISO
             writeCommand[1] = 0x24;  // Comando de múltiplos blocos
 
             System.arraycopy(uid, 0, writeCommand, 2, 8); // UID (8 bytes)
@@ -239,7 +234,7 @@ public class NfcViewModel extends AndroidViewModel {
 
 
             byte[] uid = nfcv.getTag().getId();
-            for (i = 0; i < 64; i++) {
+            for (i = 0; i < 65; i++) {
 
                 byte[] dataToWrite = new byte[]{0x00, 0x00, 0x00, 0x00};
                 byte blockAddress = (byte) i;
@@ -284,17 +279,19 @@ public class NfcViewModel extends AndroidViewModel {
 
             // Construir o comando de leitura múltipla
             byte[] readCommand = new byte[]{
-                    (byte) 0x22,  // Flags (usando endereçamento)
+                    (byte) 0x22,  // Flags (usando endereçamento) ISO
                     (byte) 0x23,  // Comando Read Multiple Block
                     uid[0], uid[1], uid[2], uid[3], uid[4], uid[5], uid[6], uid[7],  // UID (8 bytes)
                     firstBlockNumber,  // Número do primeiro bloco
                     (byte) (numberOfBlocks - 1)  // Número de blocos - 1
             };
+
             Thread.sleep(50);
             if (!nfcv.isConnected()) {
                 nfcv.close();
                 nfcv.connect();
             }
+
             Thread.sleep(50);
             Log.d("NFC_READ", "Sending read command: " + bytesToHex(readCommand));
 
@@ -308,12 +305,14 @@ public class NfcViewModel extends AndroidViewModel {
                 // A resposta bem-sucedida começa com 0x00, seguida pelos dados
                 byte[] data = Arrays.copyOfRange(response, 1, response.length);
                 Log.d("NFC_READ", "Read successful. Data: " + bytesToHex(data));
-                if (data != null) {
 
+                if (data != null) {
+                    int row = 0;
                     for (int i = 0; i < data.length; i += 4) {
                         byte[] block = Arrays.copyOfRange(data, i, i + 4);
                         String valor = bytesToHexR(block);
-                        addressList.add("Address " + i + ": " + valor);
+                        addressList.add(row +"-Address " + i + ": " + valor);
+                        row++;
                         listValue.add(block);
                     }
                 }
@@ -342,10 +341,10 @@ public class NfcViewModel extends AndroidViewModel {
 
             byte[] con = new byte[]{
                     (byte) 0x22,
-                    (byte) 0xA9,
+                    (byte) 0xA9, //comando GPO
                     (byte) 0x02,
                     uid[0], uid[1], uid[2], uid[3], uid[4], uid[5], uid[6], uid[7],  // UID completo
-                    (byte) gpoValue};
+                    (byte) gpoValue}; //  0 = Baixado , 1 = Levantado
 
             byte[] ret = nfcv.transceive(con);
 
@@ -361,7 +360,7 @@ public class NfcViewModel extends AndroidViewModel {
         }
     }
 
-    public void writeSingleBloc(NfcV nfcv, byte blockAddress, String data) {
+    public void writeSingleBlock(NfcV nfcv, byte blockAddress, String data) {
         try {
 
             if (!nfcv.isConnected()) {
@@ -381,8 +380,7 @@ public class NfcViewModel extends AndroidViewModel {
                 String trimmedByteString = byteStrings[i].trim(); // Remove espaços em branco
                 if (trimmedByteString.isEmpty()) {
                     Log.e("NFC_WRITE", "Valor de byte vazio encontrado na string de dados: " + data);
-                    // Tratar o erro adequadamente, talvez retornando ou lançando uma exceção
-                    return; // Exemplo
+                    return;
                 }
                 // Converte a string para byte.
                 // Byte.parseByte() espera valores entre -128 e 127.

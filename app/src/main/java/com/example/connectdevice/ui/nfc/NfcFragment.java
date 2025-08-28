@@ -122,7 +122,7 @@ public class NfcFragment extends Fragment {
                         NfcV nfcv = NfcV.get(tag);
 
                         if (aSwitch.isChecked() && !bSwitch.isChecked()) {
-                            nfcViewModel.writeMultipleBlocks(nfcv, blockAddress, valueStr, false);
+                            nfcViewModel.writeMultipleBlocks(nfcv, blockAddress, valueStr,false);
 
                         } else if (aSwitch.isChecked() && bSwitch.isChecked()) {
 
@@ -165,7 +165,7 @@ public class NfcFragment extends Fragment {
 
 
                         } else {
-                            nfcViewModel.writeSingleBloc(nfcv, blockAddress, valueStr);
+                            nfcViewModel.writeSingleBlock(nfcv, blockAddress, valueStr);
                         }
 
                     } else {
